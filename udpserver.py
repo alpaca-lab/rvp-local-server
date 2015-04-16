@@ -12,6 +12,7 @@ class UDPServer():
         self.tryCount = 1000
         self.speedMap = {}
         self.speedRes = {}
+        self.address = None
 
     def init_server(self):
         self.server = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -25,7 +26,13 @@ class UDPServer():
                 print e
                 address = (address[0], address[1] + 1)
 
-    def run(self):
+    def start_server(self):
+        self.init_server()
+        p = Process(target=server.mainloop, args=())
+        p.join()
+        return p
+
+    def mainloop(self):
         logging.info("UDP server start")
         logging.info("parent pid: " + str(os.getppid()))
         logging.info("pid: " + str(os.getpid()))
@@ -74,6 +81,5 @@ class UDPServer():
 
 if __name__ == "__main__":
     server = UDPServer()
-    server.init_server()
-    p = Process(target=server.run, args=())
+    server.start_server()
     print "server shutdown"
