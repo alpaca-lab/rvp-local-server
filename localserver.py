@@ -3,8 +3,10 @@ import json
 from udpserver import UDPServer
 from multiprocessing import Process, Queue
 import time
-host = '112.124.104.95'
-port = 9999
+import logging
+# host = '112.124.104.95'
+port = 9998
+host = 'localhost'
 remote = (host, port)
 
 
@@ -20,20 +22,23 @@ class LocalServer():
         self.qw = Queue()
 
     def init_slave(self):
+        print 'initializing server'
         slave = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        slave.setblocking(False)
         slave.connect(remote)
         self.udp_server = UDPServer(self.qw, self.qr)
         self.udp_process = self.udp_server.start_server()
         self.slave = slave
 
     def get_all_slaves(self):
+        print 'getting all slaves'
         msg = json.dumps({
             'req': 'get_slaves',
         })
         self.slave.send(msg)
         data = self.slave.recv(1024)
+        print data
         self.all_slaves = json.loads(data)['slaves']
+        print "all slaves: ", self.all_slaves
 
     def msg_to_udp_server(self, msg):
         try:
@@ -51,6 +56,7 @@ class LocalServer():
             return None
 
     def speed_test(self):
+        print 'start speed_test'
         self.msg_to_udp_server({
             'op': 'speed_test',
             'slaves': self.all_slaves,
@@ -60,8 +66,10 @@ class LocalServer():
             msg = self.msg_from_udp_server()
             time.sleep(5)
         self.udp_address = msg['udp_address']
+        print 'udp_address', self.udp_address
 
     def register_this_server(self):
+        print 'regester this server'
         msg = json.dumps({
             'req': 'register',
             'address': self.udp_address
@@ -73,7 +81,8 @@ class LocalServer():
             exit(1)
 
     def mainloop(self):
-        data = self.slave.recv(1024)
+        time.sleep(5)
+        # data = self.slave.recv(1024)
 
     def start_slave_server(self):
         self.init_slave()
@@ -82,3 +91,6 @@ class LocalServer():
         self.register_this_server()
         while True:
             self.mainloop()
+
+    def __del__(self):
+        self.server.close()

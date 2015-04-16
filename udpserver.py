@@ -2,7 +2,7 @@ import json
 import socket
 import logging
 from datetime import datetime
-from multiprocessing import Process, Queue
+from multiprocessing import Process, Queue, freeze_support
 import os
 
 
@@ -29,13 +29,18 @@ class UDPServer():
                 address = (address[0], address[1] + 1)
 
     def start_server(self):
-        self.init_server()
-        p = Process(target=server.mainloop, args=())
-        p.join()
+        p = Process(target=self.mainloop, args=())
+        p.start()
+        # p.join()
         return p
 
     def deal_parent_msg(self, msg):
-        pass
+        if msg['op'] == 'speed_test':
+            if len(msg['slaves']) == 0:
+                print "I'm the first"
+            for remote in msg['slaves']:
+                self.speed(remote)
+            self.qw.put_nowait({'udp_address': "123456"})
 
     def deal_udp_msg(self, address, msg):
         func_dict = {
@@ -47,9 +52,10 @@ class UDPServer():
         func(address, msg)
 
     def mainloop(self):
-        logging.info("UDP server start")
-        logging.info("parent pid: " + str(os.getppid()))
-        logging.info("pid: " + str(os.getpid()))
+        self.init_server()
+        print "UDP server start"
+        # print "parent pid: ", str(os.getppid())
+        print "pid: " + str(os.getpid())
         while True:
             if not self.qr.empty():
                 msg = self.qr.get()
