@@ -11,6 +11,6 @@ server.start()
 
 
 server.speed(hosts[0])
-time.sleep(1)
+time.sleep(2)
 print server.speedRes
 server.join()
