@@ -7,12 +7,14 @@ import os
 
 
 class UDPServer():
-    def __init__(self):
+    def __init__(self, qr, qw):
         self.server = None
         self.tryCount = 1000
         self.speedMap = {}
         self.speedRes = {}
         self.address = None
+        self.qr = qr
+        self.qw = qw
 
     def init_server(self):
         self.server = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -26,9 +28,9 @@ class UDPServer():
                 print e
                 address = (address[0], address[1] + 1)
 
-    def start_server(self, q):
+    def start_server(self):
         self.init_server()
-        p = Process(target=server.mainloop, args=(q,))
+        p = Process(target=server.mainloop, args=())
         p.join()
         return p
 
@@ -44,13 +46,13 @@ class UDPServer():
         func = func_dict.get(msg['flag'])
         func(address, msg)
 
-    def mainloop(self, q):
+    def mainloop(self):
         logging.info("UDP server start")
         logging.info("parent pid: " + str(os.getppid()))
         logging.info("pid: " + str(os.getpid()))
         while True:
-            if not q.empty():
-                msg = q.get()
+            if not self.qr.empty():
+                msg = self.qr.get()
                 self.deal_parent_msg(msg)
             else:
                 data, address = self.server.recvfrom(4096)
