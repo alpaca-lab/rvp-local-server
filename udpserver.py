@@ -1,3 +1,4 @@
+# coding: utf-8
 import json
 import socket
 import logging
@@ -38,9 +39,12 @@ class UDPServer():
         if msg['op'] == 'speed_test':
             if len(msg['slaves']) == 0:
                 print "I'm the first"
+                self.address = "123456"
             for remote in msg['slaves']:
-                self.speed(remote)
-            self.qw.put_nowait({'udp_address': "123456"})
+                (self.address, delay, rate) = self.speed(remote)
+                # do some thing记录延迟map
+
+            self.qw.put_nowait({'udp_address': self.address})
 
     def deal_udp_msg(self, address, msg):
         func_dict = {
