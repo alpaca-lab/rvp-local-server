@@ -1,7 +1,7 @@
 import socket
 import json
 from udpserver import UDPServer
-from multiprocessing import Process
+from multiprocessing import Process, Queue
 host = '112.124.104.95'
 port = 9999
 remote = (host, port)
@@ -12,12 +12,16 @@ class LocalServer():
         self.slave = None
         self.server = None
         self.all_slaves = None
-        self.udp_server = UDPServer()
+        self.udp_server = None
+        self.udp_process = None
+        self.q = Queue()
 
     def init_slave(self):
         slave = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         slave.setblocking(False)
         slave.connect(remote)
+        self.udp_server = UDPServer()
+        self.udp_process = self.udp_server.start_server(self.q)
         self.slave = slave
 
     def get_all_slaves(self):

@@ -2,7 +2,7 @@ import json
 import socket
 import logging
 from datetime import datetime
-from multiprocessing import Process
+from multiprocessing import Process, Queue
 import os
 
 
@@ -26,30 +26,40 @@ class UDPServer():
                 print e
                 address = (address[0], address[1] + 1)
 
-    def start_server(self):
+    def start_server(self, q):
         self.init_server()
-        p = Process(target=server.mainloop, args=())
+        p = Process(target=server.mainloop, args=(q,))
         p.join()
         return p
 
-    def mainloop(self):
+    def deal_parent_msg(self, msg):
+        pass
+
+    def deal_udp_msg(self, address, msg):
+        func_dict = {
+            'speed': self.deal_speed,
+            'forward': self.deal_forward,
+            'speedCallback': self.deal_speed_callback,
+        }
+
+        func = func_dict.get(msg['flag'])
+        func(address, msg)
+
+    def mainloop(self, q):
         logging.info("UDP server start")
         logging.info("parent pid: " + str(os.getppid()))
         logging.info("pid: " + str(os.getpid()))
         while True:
-            data, address = self.server.recvfrom(4096)
-            if not data:
-                print "something is wrong"
-                break
-            print "receive ", data, "from", address
-            func_dict = {
-                'speed': self.deal_speed,
-                'forward': self.deal_forward,
-                'speedCallback': self.deal_speed_callback,
-            }
-
-            func = func_dict.get(json.loads(data)['flag'])
-            func(address, data)
+            if not q.empty():
+                msg = q.get()
+                self.deal_parent_msg(msg)
+            else:
+                data, address = self.server.recvfrom(4096)
+                if not data:
+                    print "something is wrong"
+                    break
+                print "receive ", data, "from", address
+                self.deal_udp_msg(data, json.loads(data))
 
     def speed(self, address):
         tmp = str(datetime.now()).split(":")
@@ -77,7 +87,6 @@ class UDPServer():
 
     def __del__(self):
         self.server.close()
-
 
 if __name__ == "__main__":
     server = UDPServer()
