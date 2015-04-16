@@ -41,7 +41,6 @@ class UDPServer():
             'forward': self.deal_forward,
             'speedCallback': self.deal_speed_callback,
         }
-
         func = func_dict.get(msg['flag'])
         func(address, msg)
 
@@ -59,7 +58,7 @@ class UDPServer():
                     print "something is wrong"
                     break
                 print "receive ", data, "from", address
-                self.deal_udp_msg(data, json.loads(data))
+                self.deal_udp_msg(address, json.loads(data))
 
     def speed(self, address):
         tmp = str(datetime.now()).split(":")
