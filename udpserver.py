@@ -19,7 +19,8 @@ class UDPServer(threading.Thread):
                 self.server.bind(address)
                 print "UDP server bind to ", address
                 break
-            except:
+            except Exception, e:
+                print e
                 address = (address[0], address[1] + 1)
 
     def run(self):
