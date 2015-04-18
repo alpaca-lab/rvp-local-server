@@ -30,7 +30,7 @@ class LocalServer():
     def init_slave(self):
         print 'initializing server'
         slave = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        slave.setblocking(False)
+        # slave.setblocking(False)
         slave.connect(remote)
         self.udp_process = Process(target=start_udp_server, args=(self.q_to_udp_server, self.q_from_udp_server))
         self.udp_process.start()
@@ -39,12 +39,13 @@ class LocalServer():
     def get_all_slaves(self):
         print 'getting all slaves'
         msg = json.dumps({
-            'req': 'get_slaves',
+            'op': 'get_slaves',
         })
-        self.slave.send(msg)
-        data = self.slave.recv(1024)
-        print data
-        self.all_slaves = json.loads(data)['slaves']
+        self.msg_to_remote_server(msg)
+        r_msg = None
+        while r_msg is None:
+            r_msg = self.msg_from_remote()
+        self.all_slaves = r_msg['slaves']
         print "all slaves: ", self.all_slaves
 
     def speed_test(self):
@@ -56,27 +57,27 @@ class LocalServer():
         msg = self.msg_from_udp_server()
         while msg is None:
             msg = self.msg_from_udp_server()
-            time.sleep(5)
+            time.sleep(1)
         self.udp_address = msg['udp_address']
         print 'udp_address', self.udp_address
 
     def register_this_server(self):
         print 'register this server'
         msg = json.dumps({
-            'req': 'register',
+            'op': 'register',
             'address': self.udp_address
         })
-        self.slave.send(msg)
-        data = self.slave.recv(1024)
-        msg = json.loads(data)
-        if msg['ans'] != 'success':
+        self.msg_to_remote_server(msg)
+        r_msg = None
+        while r_msg is None:
+            r_msg = self.msg_from_remote()
+        if r_msg['ans'] != 'success':
             exit(1)
 
     def mainloop(self):
         while True:
             self.deal_msg_from_udp_server()
             self.deal_msg_from_remote()
-        # data = self.slave.recv(1024)
 
     def deal_msg_from_udp_server(self):
         msg = self.msg_from_udp_server()
@@ -101,7 +102,7 @@ class LocalServer():
     def msg_from_udp_server(self):
         if not self.q_from_udp_server.empty():
             msg = self.q_from_udp_server.get_nowait()
-            print "message from udp_server: ", msg
+            print "message from udp server: ", msg
             return msg
         else:
             # print "empty queue"
@@ -112,13 +113,13 @@ class LocalServer():
             data = self.slave.recv(1024)
         except Exception, e:
             print e.message
-            print "no data from remote"
             return None
         msg = json.loads(data)
         print "message from remote: ", msg
         return msg
 
     def msg_to_udp_server(self, msg):
+        print "send msg to udp server", msg
         try:
             self.q_to_udp_server.put_nowait(msg)
         except Exception, e:
@@ -126,6 +127,7 @@ class LocalServer():
             print "send message to udp server error"
 
     def msg_to_remote_server(self, msg):
+        print "send msg to remote server", msg
         try:
             self.slave.send(msg)
         except Exception, e:
