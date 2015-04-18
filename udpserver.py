@@ -19,7 +19,7 @@ class UDPServer():
     @staticmethod
     def str2address(address_str):
         str_list = address_str.split(':')
-        return str_list[0], str(str_list[1])
+        return str_list[0], int(str_list[1])
 
     @staticmethod
     def address2str(address):
@@ -46,8 +46,9 @@ class UDPServer():
         if msg['op'] == 'speed_test':
             if len(msg['slaves']) == 0:
                 print "I'm the first"
+                self.speed_test_end()
             for remote in msg['slaves']:
-                self.speed(remote)
+                self.speed_test_start(remote)
 
     def msg_from_parent(self,):
         if not self.qr.empty():
@@ -58,11 +59,7 @@ class UDPServer():
             return None
 
     def deal_udp_msg(self,):
-        data, address = self.msg_from_remote_udp()
-        if not data:
-            print "empty message from remote udp server"
-        # print "receive ", data, "from", address
-        msg = json.loads(data)
+        msg, address = self.msg_from_remote_udp()
         func_dict = {
             'speed': self.deal_speed,
             'forward': self.deal_forward,
@@ -73,32 +70,50 @@ class UDPServer():
 
     def msg_from_remote_udp(self):
         data, address = self.server.recvfrom(4096)
-        return data, address
+        print "receive ", data, "from", address
+        if not data:
+            print "empty message from remote udp server"
+        return json.loads(data), address
+
+    def msg_to_remote_udp(self, msg, address):
+        try:
+            self.server.sendto(json.dumps(msg), address)
+        except Exception, e:
+            print e
 
     def mainloop(self):
         while True:
             self.deal_parent_msg()
             self.deal_udp_msg()
+            print "one udp loop"
 
-    def speed(self, address_str):
+    def speed_test_start(self, address_str):
         print 'start speed test to ', address_str
         now = time.time()
         self.speedMap[address_str] = now
         self.speedRes[address_str] = -1
         address = (self.str2address(address_str))
-        self.server.sendto({"op": "speed"}, address)
+        self.msg_to_remote_udp({
+            "op": "speed"
+        }, address)
+
+    def speed_test_end(self):
+        self.qw.put_nowait({'udp_address': self.address})
 
     def deal_speed_callback(self, address, msg):
         now = time.time()
         address_str = self.address2str(address)
         delay = (now - self.speedMap[address_str]) * 1000
-        print "modifying ", address
+        print "modifying ", address, ", delay: ", delay
         self.speedRes[address_str] = delay
         self.address = msg['address']
-        self.qw.put_nowait({'udp_address': self.address})
+        self.speed_test_end()
 
     def deal_speed(self, address, data):
-        self.server.sendto({"op": "speedCallback", "address": self.address2str(address)}, address)
+        self.msg_to_remote_udp({
+            "op": "speedCallback",
+            "address": self.address2str(address)
+        }, address)
 
     def deal_forward(self, address, data):
         pass

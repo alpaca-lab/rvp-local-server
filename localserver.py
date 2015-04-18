@@ -30,22 +30,21 @@ class LocalServer():
     def init_slave(self):
         print 'initializing server'
         slave = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        # slave.setblocking(False)
         slave.connect(remote)
+        slave.setblocking(False)
         self.udp_process = Process(target=start_udp_server, args=(self.q_to_udp_server, self.q_from_udp_server))
         self.udp_process.start()
         self.slave = slave
 
     def get_all_slaves(self):
         print 'getting all slaves'
-        msg = json.dumps({
+        self.msg_to_remote_server({
             'op': 'get_slaves',
         })
-        self.msg_to_remote_server(msg)
-        r_msg = None
-        while r_msg is None:
-            r_msg = self.msg_from_remote()
-        self.all_slaves = r_msg['slaves']
+        msg = None
+        while msg is None:
+            msg = self.msg_from_remote()
+        self.all_slaves = msg['slaves']
         print "all slaves: ", self.all_slaves
 
     def speed_test(self):
@@ -63,15 +62,14 @@ class LocalServer():
 
     def register_this_server(self):
         print 'register this server'
-        msg = json.dumps({
+        self.msg_to_remote_server({
             'op': 'register',
             'address': self.udp_address
         })
-        self.msg_to_remote_server(msg)
-        r_msg = None
-        while r_msg is None:
-            r_msg = self.msg_from_remote()
-        if r_msg['ans'] != 'success':
+        msg = None
+        while msg is None:
+            msg = self.msg_from_remote()
+        if msg['ans'] != 'success':
             exit(1)
 
     def mainloop(self):
@@ -112,7 +110,6 @@ class LocalServer():
         try:
             data = self.slave.recv(1024)
         except Exception, e:
-            print e.message
             return None
         msg = json.loads(data)
         print "message from remote: ", msg
@@ -129,7 +126,8 @@ class LocalServer():
     def msg_to_remote_server(self, msg):
         print "send msg to remote server", msg
         try:
-            self.slave.send(msg)
+            data = json.dumps(msg)
+            self.slave.send(data)
         except Exception, e:
             print e.message
             print "send message to remote server error"
