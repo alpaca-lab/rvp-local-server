@@ -1,5 +1,6 @@
 # coding: utf-8
 import json
+import time
 import socket
 import logging
 from datetime import datetime
@@ -19,34 +20,44 @@ class UDPServer():
 
     def init_server(self):
         self.server = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        address = ('0.0.0.0', 30000)
+        address = ('192.168.1.204', 30000)
         while True:
             try:
                 self.server.bind(address)
                 print "UDP server bind to ", address
+                self.address = address
                 break
             except Exception, e:
                 print e
                 address = (address[0], address[1] + 1)
 
-    def start_server(self):
-        p = Process(target=self.mainloop, args=())
-        p.start()
-        # p.join()
-        return p
-
-    def deal_parent_msg(self, msg):
+    def deal_parent_msg(self,):
+        msg = self.msg_from_parent()
+        print 'receive', msg, ' from parent'
+        if msg is None:
+            return
         if msg['op'] == 'speed_test':
             if len(msg['slaves']) == 0:
                 print "I'm the first"
-                self.address = "123456"
             for remote in msg['slaves']:
                 (self.address, delay, rate) = self.speed(remote)
                 # do some thing记录延迟map
-
             self.qw.put_nowait({'udp_address': self.address})
 
-    def deal_udp_msg(self, address, msg):
+    def msg_from_parent(self,):
+        if not self.qr.empty():
+            msg = self.qr.get_nowait()
+            return msg
+        else:
+            print "empty queue"
+            return None
+
+    def deal_udp_msg(self,):
+        data, address = self.msg_from_remote_udp()
+        if not data:
+            print "something is wrong"
+        # print "receive ", data, "from", address
+        msg = json.loads(data)
         func_dict = {
             'speed': self.deal_speed,
             'forward': self.deal_forward,
@@ -55,38 +66,33 @@ class UDPServer():
         func = func_dict.get(msg['flag'])
         func(address, msg)
 
+    def msg_from_remote_udp(self):
+        data, address = self.server.recvfrom(4096)
+        return data, address
+
     def mainloop(self):
         self.init_server()
         print "UDP server start"
         # print "parent pid: ", str(os.getppid())
         print "pid: " + str(os.getpid())
         while True:
-            if not self.qr.empty():
-                msg = self.qr.get()
-                self.deal_parent_msg(msg)
-            else:
-                data, address = self.server.recvfrom(4096)
-                if not data:
-                    print "something is wrong"
-                    break
-                print "receive ", data, "from", address
-                self.deal_udp_msg(address, json.loads(data))
+            self.deal_parent_msg()
+            self.deal_udp_msg()
 
     def speed(self, address):
-        tmp = str(datetime.now()).split(":")
-        now = int(float(tmp[len(tmp) - 1]) * 1000000)
+        print 'start speed test to ', address
+        now = time.time()
         self.speedMap[address] = now
         self.speedRes[address] = -1
-        tmp = address.split(":")
-        address = (tmp[0], int(tmp[1]))
+        address = (item for item in address.split(':'))
         self.server.sendto("speed", address)
 
     def deal_speed_callback(self, address, data):
-        tmp = str(datetime.now()).split(":")
-        now = int(float(tmp[len(tmp) - 1]) * 1000000)
-        time = (now - self.speedMap[str(address[0]+":"+str(address[1]))]) / 1000
-        print "modifying ", str(address[0])+":"+str(address[1])
-        self.speedRes[str(address[0])+":"+str(address[1])] = time
+        now = time.time()
+        address = ';'.join(address)
+        delay = (now - self.speedMap[address]) * 1000
+        print "modifying ", address
+        self.speedRes[address] = delay
 
     def deal_speed(self, address, data):
         # tmp = address.split(":")
@@ -99,7 +105,8 @@ class UDPServer():
     def __del__(self):
         self.server.close()
 
-if __name__ == "__main__":
-    server = UDPServer()
-    server.start_server()
-    print "server shutdown"
+
+def start_udp_server(qr, qw):
+    udp_server = UDPServer(qr, qw)
+    udp_server.mainloop()
+

@@ -1,7 +1,6 @@
-from localserver import LocalServer
+from localserver import start_slave_server
 import multiprocessing
 
 if __name__ == '__main__':
     multiprocessing.freeze_support()
-    server = LocalServer()
-    server.start_slave_server()
+    start_slave_server()
