@@ -7,6 +7,7 @@ import os
 
 
 class UDPServer():
+
     def __init__(self, qr, qw):
         self.server = None
         self.tryCount = 1000
@@ -15,6 +16,14 @@ class UDPServer():
         self.address = None
         self.q_from_parent = qr
         self.q_to_parent = qw
+        self.udp_func_dict = {
+            'speed': self.deal_speed,
+            'forward': self.deal_forward,
+            'speedCallback': self.deal_speed_callback,
+        }
+        self.parent_func_dict = {
+            'speed_test': self.speed_test_start
+        }
 
     @staticmethod
     def str2address(address_str):
@@ -40,19 +49,15 @@ class UDPServer():
 
     def deal_parent_msg(self,):
         msg = self.msg_from_parent()
-        print 'receive', msg, ' from parent'
         if msg is None:
             return
-        if msg['op'] == 'speed_test':
-            if len(msg['slaves']) == 0:
-                print "I'm the first"
-                self.speed_test_end()
-            for remote in msg['slaves']:
-                self.speed_test_start(remote)
+        func = self.parent_func_dict.get(msg['op'])
+        func(msg)
 
     def msg_from_parent(self,):
         if not self.q_from_parent.empty():
             msg = self.q_from_parent.get_nowait()
+            print 'receive', msg, ' from parent'
             return msg
         else:
             # print "empty queue"
@@ -66,12 +71,7 @@ class UDPServer():
 
     def deal_udp_msg(self,):
         msg, address = self.msg_from_remote_udp()
-        func_dict = {
-            'speed': self.deal_speed,
-            'forward': self.deal_forward,
-            'speedCallback': self.deal_speed_callback,
-        }
-        func = func_dict.get(msg['op'])
+        func = self.udp_func_dict.get(msg['op'])
         func(address, msg)
 
     def msg_from_remote_udp(self):
@@ -93,15 +93,19 @@ class UDPServer():
             self.deal_udp_msg()
             print "one udp loop"
 
-    def speed_test_start(self, address_str):
-        print 'start speed test to ', address_str
-        now = time.time()
-        self.speedMap[address_str] = now
-        self.speedRes[address_str] = -1
-        address = (self.str2address(address_str))
-        self.msg_to_remote_udp({
-            "op": "speed"
-        }, address)
+    def speed_test_start(self, msg):
+        if len(msg['slaves']) == 0:
+            print "I'm the first"
+            self.speed_test_end()
+        for address_str in msg['slaves']:
+            print 'start speed test to ', address_str
+            now = time.time()
+            self.speedMap[address_str] = now
+            self.speedRes[address_str] = -1
+            address = (self.str2address(address_str))
+            self.msg_to_remote_udp({
+                "op": "speed"
+            }, address)
 
     def speed_test_end(self):
         self.msg_to_parent({'udp_address': self.address})
@@ -115,7 +119,7 @@ class UDPServer():
         self.address = msg['address']
         self.speed_test_end()
 
-    def deal_speed(self, address, data):
+    def deal_speed(self, address, msg):
         self.msg_to_remote_udp({
             "op": "speedCallback",
             "address": self.address2str(address)
