@@ -13,8 +13,8 @@ class UDPServer():
         self.speedMap = {}
         self.speedRes = {}
         self.address = None
-        self.qr = qr
-        self.qw = qw
+        self.q_from_parent = qr
+        self.q_to_parent = qw
 
     @staticmethod
     def str2address(address_str):
@@ -51,12 +51,18 @@ class UDPServer():
                 self.speed_test_start(remote)
 
     def msg_from_parent(self,):
-        if not self.qr.empty():
-            msg = self.qr.get_nowait()
+        if not self.q_from_parent.empty():
+            msg = self.q_from_parent.get_nowait()
             return msg
         else:
-            print "empty queue"
+            # print "empty queue"
             return None
+
+    def msg_to_parent(self, msg):
+        try:
+            self.q_to_parent.put_nowait()
+        except Exception, e:
+            print e.message
 
     def deal_udp_msg(self,):
         msg, address = self.msg_from_remote_udp()
@@ -81,7 +87,7 @@ class UDPServer():
         except Exception, e:
             print e
 
-    def mainloop(self):
+    def start(self):
         while True:
             self.deal_parent_msg()
             self.deal_udp_msg()
@@ -98,7 +104,7 @@ class UDPServer():
         }, address)
 
     def speed_test_end(self):
-        self.qw.put_nowait({'udp_address': self.address})
+        self.msg_to_parent({'udp_address': self.address})
 
     def deal_speed_callback(self, address, msg):
         now = time.time()
@@ -127,5 +133,5 @@ def start_udp_server(qr, qw):
     udp_server.init_server()
     print "UDP server start"
     print "pid: " + str(os.getpid())
-    udp_server.mainloop()
+    udp_server.start()
 
