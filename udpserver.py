@@ -126,6 +126,6 @@ def start_udp_server(qr, qw):
     udp_server = UDPServer(qr, qw)
     udp_server.init_server()
     print "UDP server start"
-    print "pid: " + str(os.getpid())
+    print "pid: ", os.getpid()
     udp_server.mainloop()
 
